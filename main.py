@@ -80,7 +80,7 @@ async def shutdown_db_client():
 
 
 # Endpoint to search for garments
-@app.get("/search/{query}")
+@app.get("/search")
 async def search_garments(query: str, skip: int = 0, limit: int = 20):
     garments = []
 
