@@ -81,16 +81,19 @@ async def shutdown_db_client():
 
 # Endpoint to search for garments
 @app.get("/search/{query}")
-async def search_garments(query: str):
+async def search_garments(query: str, skip: int = 0, limit: int = 20):
     garments = []
 
     projection = {"position": 0, "product_imgs_src": 0, "image_urls": 0}
 
     # search based on text index
     cursor = app.mongodb[mongo_collection_name].find(
-        {"$text": {"$search": query}},  # Search for garments that match the query based on the text index
-        projection=projection  # Use projection to fetch only required fields
-    )
+        # Search for garments that match the query based on the text index
+        {"$text": {"$search": query}},
+        # Use projection to fetch only required fields
+        projection=projection
+    ).skip(skip).limit(limit)
+    # .sort([("score", {"$meta": "textScore"})]) # Sort the results based on the text relevance score
 
     # search based on regex
     # cursor = app.mongodb[mongo_collection_name].find(
@@ -107,5 +110,5 @@ async def search_garments(query: str):
 
     logger.debug(f"{len(garments)} garments found.")
 
-    return garments[:20]
+    return garments
 
