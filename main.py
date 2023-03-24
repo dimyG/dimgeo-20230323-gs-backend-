@@ -7,6 +7,7 @@ from logging.config import dictConfig
 from config import LogConfig
 from dotenv import load_dotenv
 from pathlib import Path
+from fastapi.middleware.cors import CORSMiddleware
 
 
 # Note: It is recommended to call the dictConfig(...) function before the FastAPI initialization.
@@ -29,6 +30,15 @@ logger.debug(f"mongo_collection_name: {mongo_collection_name}")
 
 # Initialize the FastAPI app
 app = FastAPI()
+
+# Add CORS middleware to allow cross-origin requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 async def count_indexes(collection):
