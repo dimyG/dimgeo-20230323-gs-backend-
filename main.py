@@ -3,6 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import json
+# import asyncio
 from logging.config import dictConfig
 from config import LogConfig
 from dotenv import load_dotenv
@@ -102,8 +103,10 @@ async def search_garments(query: str, skip: int = 0, limit: int = 20):
         {"$text": {"$search": query}},
         # Use projection to fetch only required fields
         projection=projection
-    ).skip(skip).limit(limit)
-    # .sort([("score", {"$meta": "textScore"})]) # Sort the results based on the text relevance score
+    )
+
+    cursor.sort([("score", {"$meta": "textScore"})])  # Sort the results based on the text relevance score
+    cursor.skip(skip).limit(limit)  # Skip and limit the results for pagination
 
     # search based on regex
     # cursor = app.mongodb[mongo_collection_name].find(
@@ -116,9 +119,12 @@ async def search_garments(query: str, skip: int = 0, limit: int = 20):
         # ObjectId is not json serializable, convert it to a string before appending the garment
         garment["_id"] = str(garment["_id"])
         garments.append(garment)
-        logger.debug(f"garment: {garment}")
+        # logger.debug(f"garment: {garment}")
 
     logger.debug(f"{len(garments)} garments found.")
+
+    # sleep for 2 seconds to simulate a slow search
+    # await asyncio.sleep(2)
 
     return garments
 
