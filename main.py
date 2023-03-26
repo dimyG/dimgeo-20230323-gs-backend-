@@ -128,9 +128,12 @@ async def search_garments(query: str, skip: int = 0, limit: int = 20):
     cursor.skip(skip).limit(limit)  # Skip and limit the results for pagination
 
     # search based on regex
-    # cursor = app.mongodb[mongo_collection_name].find(
+    # cursor = mongodb[mongo_collection_name].find(
     #     # use a regex to search for garments that match the query
-    #     {"$or": [{"product_title": {"$regex": query, "$options": "i"}}, {"product_description": {"$regex": query, "$options": "i"}}]},
+    #     {"$or": [
+    #         {"product_title": {"$regex": query, "$options": "i"}},
+    #         {"product_description": {"$regex": query, "$options": "i"}}
+    #     ]},
     #     projection=projection  # Use projection to fetch only required fields
     # )
 
