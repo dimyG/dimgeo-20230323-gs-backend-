@@ -7,10 +7,24 @@ default_limit = 20
 
 
 def test_search_garments(client):
+    # check that a query returns results
     response = client.get("/search", params={"query": "shirt", "skip": 0, "limit": 10})
     assert response.status_code == 200
     data = response.json()
     assert len(data) <= 10
+
+
+def test_search_garments_different_skip(client):
+    # check that the same query but with different skip returns different results
+    response = client.get("/search", params={"query": "shirt", "skip": 0, "limit": 10})
+    assert response.status_code == 200
+    data = response.json()
+
+    response = client.get("/search", params={"query": "shirt", "skip": 10, "limit": 10})
+    assert response.status_code == 200
+    data3 = response.json()
+
+    assert data != data3
 
 
 def test_search_garments_no_results(client):
