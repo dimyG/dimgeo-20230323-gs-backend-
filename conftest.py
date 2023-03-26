@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from main import app
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def client():
     # When you need your event handlers (startup and shutdown) to run in your tests,
     # you can use the TestClient with a with statement
