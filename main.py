@@ -4,7 +4,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import json
-# import asyncio
+import asyncio
 from logging.config import dictConfig
 from config import LogConfig
 from dotenv import load_dotenv
@@ -59,28 +59,37 @@ async def load_data_from_file(file_path="mongo_initial_data/garments.jl"):
     await mongodb[mongo_collection_name].insert_many(garments)
 
 
-async def startup_db_client():
-    # Initialize the MongoDB client
-    logger.debug("starting up db client...")
-    global mongodb
-    global mongodb_client
-
-    mongodb_client = AsyncIOMotorClient(mongo_url)
-    mongodb = mongodb_client[mongo_db_name]
-
-    # if mongo has no data, load data from the jl file
-    if await mongodb[mongo_collection_name].count_documents({}) == 0:
-        await load_data_from_file()
-
-    index_count = await count_indexes(mongodb[mongo_collection_name])
+async def initialize_indexes(db, collection_name):
+    logger.debug("Initializing indexes...")
+    index_count = await count_indexes(db[collection_name])
     logger.debug(f"index_count: {index_count}")
 
     # if garments collection has only the default index, create one on the product_title and product_description fields
     if index_count == 1:
         logger.info("Creating text index...")
-        await mongodb[mongo_collection_name].create_index(
+        await db[collection_name].create_index(
             [("product_title", "text"), ("product_description", "text")]
         )
+
+
+async def load_init_data(db, collection_name):
+    # if mongo has no data, load data from the jl file
+    if await db[collection_name].count_documents({}) == 0:
+        await load_data_from_file()
+
+
+async def connect_to_mongo():
+    logger.debug("connecting to mongodb...")
+    global mongodb
+    global mongodb_client
+    mongodb_client = AsyncIOMotorClient(mongo_url)
+    mongodb = mongodb_client[mongo_db_name]
+
+
+async def startup_db_sequence():
+    await connect_to_mongo()
+    await load_init_data(mongodb, mongo_collection_name)
+    await initialize_indexes(mongodb, mongo_collection_name)
 
 
 async def shutdown_db_client():
@@ -91,7 +100,7 @@ async def shutdown_db_client():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await startup_db_client()
+    await startup_db_sequence()
     yield
     await shutdown_db_client()
 
@@ -116,34 +125,40 @@ async def search_garments(query: str, skip: int = 0, limit: int = 20):
 
     projection = {"position": 0, "product_imgs_src": 0, "image_urls": 0}
 
-    # search based on text index
-    cursor = mongodb[mongo_collection_name].find(
-        # Search for garments that match the query based on the text index
-        {"$text": {"$search": query}},
-        # Use projection to fetch only required fields
-        projection=projection
-    )
+    try:
+        # search based on text index
+        cursor = mongodb[mongo_collection_name].find(
+            # Search for garments that match the query based on the text index
+            {"$text": {"$search": query}},
+            # Use projection to fetch only required fields
+            projection=projection
+        )
 
-    cursor.sort([("score", {"$meta": "textScore"})])  # Sort the results based on the text relevance score
-    cursor.skip(skip).limit(limit)  # Skip and limit the results for pagination
+        cursor.sort([("score", {"$meta": "textScore"})])  # Sort the results based on the text relevance score
+        cursor.skip(skip).limit(limit)  # Skip and limit the results for pagination
 
-    # search based on regex
-    # cursor = mongodb[mongo_collection_name].find(
-    #     # use a regex to search for garments that match the query
-    #     {"$or": [
-    #         {"product_title": {"$regex": query, "$options": "i"}},
-    #         {"product_description": {"$regex": query, "$options": "i"}}
-    #     ]},
-    #     projection=projection  # Use projection to fetch only required fields
-    # )
+        # search based on regex
+        # cursor = mongodb[mongo_collection_name].find(
+        #     # use a regex to search for garments that match the query
+        #     {"$or": [
+        #         {"product_title": {"$regex": query, "$options": "i"}},
+        #         {"product_description": {"$regex": query, "$options": "i"}}
+        #     ]},
+        #     projection=projection  # Use projection to fetch only required fields
+        # )
 
-    async for garment in cursor:
-        # ObjectId is not json serializable, convert it to a string before appending the garment
-        garment["_id"] = str(garment["_id"])
-        garments.append(garment)
-        # logger.debug(f"garment: {garment}")
+        async for garment in cursor:
+            # ObjectId is not json serializable, convert it to a string before appending the garment
+            garment["_id"] = str(garment["_id"])
+            garments.append(garment)
+            # logger.debug(f"garment: {garment}")
 
-    logger.debug(f"{len(garments)} garments found.")
+        logger.debug(f"{len(garments)} garments found.")
+
+    except Exception as e:
+        logger.error(f"Error while searching for garments: {e}")
+        # if there is an error, just return an empty list
+        garments = []
 
     # sleep for 2 seconds to simulate a slow search
     # await asyncio.sleep(2)
